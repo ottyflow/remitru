@@ -1,0 +1,19 @@
+[gd_scene load_steps=6 format=3 uid="uid://450dnuml1mqc"]
+
+[ext_resource type="PackedScene" uid="uid://wvhvw4lbjpsh" path="res://scenes/world/City.tscn" id="1_0bbpv"]
+[ext_resource type="Script" uid="uid://y6mny02y64l0" path="res://scripts/main.gd" id="1_rarhs"]
+[ext_resource type="PackedScene" uid="uid://ctrpv73rwgtbo" path="res://scenes/ui/UI.tscn" id="2_rarhs"]
+[ext_resource type="Script" uid="uid://cy50tnqcy0uw3" path="res://scripts/mission_manager.gd" id="3_vcsgt"]
+[ext_resource type="Script" uid="uid://bk7pdojrnewuw" path="res://scripts/ui.gd" id="4_vcsgt"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_rarhs")
+
+[node name="City" parent="." instance=ExtResource("1_0bbpv")]
+
+[node name="UI" parent="." instance=ExtResource("2_rarhs")]
+script = ExtResource("4_vcsgt")
+
+[node name="MissionManager" type="Node" parent="."]
+script = ExtResource("3_vcsgt")
+metadata/_custom_type_script = "uid://cy50tnqcy0uw3"
