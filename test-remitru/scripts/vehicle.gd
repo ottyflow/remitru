@@ -3,6 +3,18 @@ class_name Vehicle
 
 @export var speed: float = 6.0
 
+enum VehicleType {
+	MOTO,
+	VAN,
+	TRUCK
+}
+@export var type: VehicleType = VehicleType.MOTO
+
+@export var max_cargo: int = 10
+@export var fuel_efficiency: float = 1.0 # 1.0 = normal, <1 = consume menos
+@export var reliability: float = 1.0     # 1.0 = fiable, <1 = falla más con mal mantenimiento
+@export var maintenance_level: float = 1.0 # 1.0 = perfecto, 0.0 = roto
+
 var current_mission: Mission = null
 var path: Array[Vector3] = []
 var path_index: int = 0

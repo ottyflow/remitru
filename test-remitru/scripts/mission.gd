@@ -8,9 +8,18 @@ class_name Mission
 @export var base_cost: int = 0     # Coste estimado (combustible, peajes, etc.)
 @export var estimated_time: float = 0.0
 
+enum MissionType {
+	DELIVERY,
+	MULTIPLE,
+	PASSENGER,
+	SPECIAL,
+	URGENT
+}
+@export var type: MissionType = MissionType.DELIVERY
+
 # Riesgo
 @export var risk_level: int = 1    # 1 = bajo, 2 = medio, 3 = alto
-@export var risk_type: String = "" # "robo", "accidente", etc.
+@export var risk_type: String = "" # "robo", "accidente", "multa", "retraso"
 
 # Puntos en el mapa
 @export var start_point: Vector3 = Vector3.ZERO

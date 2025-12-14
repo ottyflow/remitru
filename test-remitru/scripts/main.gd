@@ -15,7 +15,8 @@ const MAP_MAX_X := 18.0
 const MAP_MIN_Z := -18.0
 const MAP_MAX_Z := 18.0
 
-var main_vehicle: Vehicle
+var fleet: Array[Vehicle] = []
+var pending_mission_selection: Mission = null
 
 func _ready() -> void:
 	randomize()
@@ -23,8 +24,9 @@ func _ready() -> void:
 	mission_manager.mission_created.connect(_on_mission_created)
 	mission_manager.mission_finished.connect(_on_mission_finished)
 	ui.mission_selected.connect(_on_ui_mission_selected)
+	ui.vehicle_selected.connect(_on_ui_vehicle_selected)
 
-	_spawn_initial_vehicle()
+	_spawn_initial_fleet()
 
 	# AHORA sí generamos las misiones (después de conectar señales)
 	mission_manager.generate_initial_missions(5)
@@ -33,26 +35,49 @@ func _ready() -> void:
 	ui.update_reputation(reputation)
 	ui.show_notification("Elegí una misión para empezar")
 
-func _spawn_initial_vehicle() -> void:
-	main_vehicle = VEHICLE_SCENE.instantiate()
-	vehicles_root.add_child(main_vehicle)
-	main_vehicle.global_position = Vector3(0, 0, 0)
-	main_vehicle.mission_route_completed.connect(_on_vehicle_mission_route_completed)
-	print("MAIN: vehículo instanciado en", main_vehicle.global_position)
+func _spawn_initial_fleet() -> void:
+	# Crear 3 vehículos: Moto, Van, Camion
+	var types = [Vehicle.VehicleType.MOTO, Vehicle.VehicleType.VAN, Vehicle.VehicleType.TRUCK]
+	
+	for i in range(types.size()):
+		var v = VEHICLE_SCENE.instantiate()
+		vehicles_root.add_child(v)
+		v.type = types[i]
+		# Posicionamiento simple en linea
+		v.global_position = Vector3(i * 3.0, 0, 0) 
+		v.mission_route_completed.connect(_on_vehicle_mission_route_completed)
+		fleet.append(v)
+		print("MAIN: vehículo tipo ", v.type, " instanciado en ", v.global_position)
 
 func _on_mission_created(mission: Mission) -> void:
 	ui.add_mission_to_list(mission)
 
 func _on_ui_mission_selected(mission_id: String) -> void:
-	if main_vehicle.on_mission:
-		ui.show_notification("El vehículo ya está en una misión.")
-		return
-
 	var mission := mission_manager.get_mission_by_id(mission_id)
 	if mission == null:
 		ui.show_notification("Misión no encontrada.")
 		return
 
+	# Guardar seleccion y mostrar selector de vehiculos
+	pending_mission_selection = mission
+	ui.show_vehicle_selector(fleet)
+
+func _on_ui_vehicle_selected(vehicle_index: int) -> void:
+	if pending_mission_selection == null:
+		return
+	
+	if vehicle_index < 0 or vehicle_index >= fleet.size():
+		return
+		
+	var selected_vehicle = fleet[vehicle_index]
+	if selected_vehicle.on_mission:
+		ui.show_notification("Vehículo ocupado.")
+		return # No deberia pasar si la UI deshabilita el botón
+		
+	_assign_mission_to_vehicle(selected_vehicle, pending_mission_selection)
+	pending_mission_selection = null
+
+func _assign_mission_to_vehicle(vehicle: Vehicle, mission: Mission) -> void:
 	mission_manager.start_mission(mission)
 
 	var path: Array[Vector3] = []
@@ -66,7 +91,9 @@ func _on_ui_mission_selected(mission_id: String) -> void:
 
 	path.append(mission.end_point)
 
-	main_vehicle.assign_mission(mission, path)
+	vehicle.assign_mission(mission, path)
+	ui.show_notification("Misión asignada a vehículo " + str(vehicle.type))
+
 
 func _on_vehicle_mission_route_completed(_vehicle: Vehicle, mission: Mission) -> void:
 	print("MAIN: vehículo reporta fin de ruta para misión:", mission.name)
@@ -83,7 +110,8 @@ func _on_mission_finished(mission: Mission, success: bool, result: Dictionary) -
 	ui.update_money(money)
 	ui.update_reputation(reputation)
 	ui.show_mission_result(mission, success, result)
-
+	
+	# Refrescar lista de misiones
 	ui.clear_missions_list()
 	for m in mission_manager.active_missions:
 		ui.add_mission_to_list(m)
