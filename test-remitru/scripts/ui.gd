@@ -1,5 +1,9 @@
 extends CanvasLayer
 class_name GameUI
+## Control de Interfaz de Usuario (ui.gd)
+##
+## Gestiona todos los elementos visuales 2D: botones de misión, notificaciones,
+## paneles de estado (dinero, reputación) y selector de vehículos.
 
 signal mission_selected(mission_id: String)
 signal vehicle_selected(vehicle_index: int)
@@ -16,6 +20,7 @@ func _ready() -> void:
 	notification_label.text = "UI lista"
 	_create_vehicle_selector_ui()
 
+## Crea programáticamente el panel y layout para el selector de vehículos.
 func _create_vehicle_selector_ui() -> void:
 	# Crear panel flotante para seleccionar vehiculos
 	vehicle_selector_panel = Panel.new()
@@ -41,6 +46,7 @@ func update_money(money: int) -> void:
 func update_reputation(rep: float) -> void:
 	reputation_label.text = "Reputación: " + str(rep)
 
+## Crea un botón dinámico para una nueva misión en la lista de UI.
 func add_mission_to_list(mission: Mission) -> void:
 	if mission == null: return
 
@@ -49,17 +55,20 @@ func add_mission_to_list(mission: Mission) -> void:
 	var button: Button = Button.new()
 	var type_str = "Std"
 	if "type" in mission:
-		type_str = str(mission.type) # Idealmente traducir enum a texto
+		type_str = str(mission.type) # Idealmente traducir enum a texto, ahora usa índice
 	
 	button.text = "%s | $%d | %s" % [mission.name, mission.reward, type_str]
+	# Conectar pasando argumentos extras (bind)
 	button.pressed.connect(Callable(self, "_on_mission_button_pressed").bind(mission.id))
 	missions_list.add_child(button)
 
+## Limpia todos los botones de la lista de misiones.
 func clear_missions_list() -> void:
 	for child in missions_list.get_children():
 		child.queue_free()
 	mission_map.clear()
 
+## Muestra un mensaje de resultado (éxito/fracaso) en el área de notificaciones.
 func show_mission_result(mission: Mission, success: bool, result: Dictionary) -> void:
 	if mission == null: return
 
@@ -77,6 +86,7 @@ func show_notification(text: String) -> void:
 func _on_mission_button_pressed(mission_id: String) -> void:
 	emit_signal("mission_selected", mission_id)
 
+## Muestra el panel selector de vehículos, re-generando los botones según estado actual de la flota.
 func show_vehicle_selector(fleet: Array) -> void:
 	if not vehicle_selector_panel: return
 	
@@ -90,7 +100,7 @@ func show_vehicle_selector(fleet: Array) -> void:
 		var veh = fleet[i]
 		var btn = Button.new()
 		
-		# Intentar obtener nombre del tipo
+		# Intentar obtener nombre legible del tipo
 		var type_name = "Vehículo"
 		if "type" in veh:
 			match veh.type:
