@@ -1,5 +1,10 @@
 extends Node
 class_name MissionManager
+## Gestor de Misiones (mission_manager.gd)
+##
+## Esta clase se encarga de crear, administrar y resolver misiones.
+## Contiene la lógica matemática para generar misiones aleatorias y calcular sus resultados (éxito/fracaso)
+## basados en probabilidades.
 
 signal mission_created(mission: Mission)
 signal mission_started(mission: Mission)
@@ -9,8 +14,9 @@ var active_missions: Array[Mission] = []
 
 func _ready() -> void:
 	randomize()
-	# NO generamos misiones acá
+	# NO generamos misiones acá, se llama desde Main para asegurar orden de inicialización
 
+## Genera un lote inicial de misiones.
 func generate_initial_missions(count: int = 5) -> void:
 	for i in range(count):
 		var mission := _create_random_mission()
@@ -22,18 +28,46 @@ const MAP_MAX_X := 18.0
 const MAP_MIN_Z := -18.0
 const MAP_MAX_Z := 18.0
 
+## Crea una nueva instancia de Misión con datos aleatorios.
+## Configura recompensas, costos y riesgos según el tipo de misión.
 func _create_random_mission() -> Mission:
 	var m := Mission.new()
-	m.id = str(Time.get_ticks_msec())
-	m.name = "Delivery #" + str(randi() % 1000)
+	m.id = str(Time.get_ticks_msec()) + "_" + str(randi()) # ID único basado en tiempo + random
+	
+	# Elegir tipo aleatorio
+	var types = Mission.MissionType.values()
+	m.type = types[randi() % types.size()]
+	
+	# Configurar parámetros según tipo
+	match m.type:
+		Mission.MissionType.DELIVERY:
+			m.name = "Reparto Std. #" + str(randi() % 1000)
+			m.reward = 150 + randi() % 150
+			m.base_cost = 20 + randi() % 30
+			m.risk_level = 1
+			m.risk_type = "retraso"
+		Mission.MissionType.MULTIPLE:
+			m.name = "Ruta Múltiple #" + str(randi() % 1000)
+			m.reward = 350 + randi() % 200
+			m.base_cost = 50 + randi() % 50
+			m.risk_level = 2
+			m.risk_type = "accidente"
+		Mission.MissionType.URGENT:
+			m.name = "URGENTE #" + str(randi() % 1000)
+			m.reward = 600 + randi() % 300
+			m.base_cost = 40 + randi() % 40
+			m.risk_level = 3
+			m.risk_type = "multa"
+		_:
+			m.name = "Encargo #" + str(randi() % 1000)
+			m.reward = 200
+			m.base_cost = 30
+			m.risk_level = 1
+			m.risk_type = "robo"
 
-	m.reward = 150 + randi() % 300
-	m.base_cost = 30 + randi() % 70
 	m.estimated_time = 30.0
 
-	m.risk_level = randi() % 3 + 1
-	m.risk_type = "robo"
-
+	# Puntos aleatorios en el mapa
 	var start_x = randf_range(MAP_MIN_X, MAP_MAX_X)
 	var start_z = randf_range(MAP_MIN_Z, MAP_MAX_Z)
 	var end_x = randf_range(MAP_MIN_X, MAP_MAX_X)
@@ -45,40 +79,61 @@ func _create_random_mission() -> Mission:
 	m.status = Mission.STATUS_PENDING
 	return m
 
+## Busca una misión activa por su ID.
 func get_mission_by_id(mission_id: String) -> Mission:
 	for m in active_missions:
 		if m.id == mission_id:
 			return m
 	return null
 
+## Marca una misión como iniciada.
 func start_mission(mission: Mission) -> void:
 	if mission == null:
 		return
 	mission.status = Mission.STATUS_IN_PROGRESS
 	emit_signal("mission_started", mission)
 
+## Determina el resultado final de una misión completada.
+## Utiliza el `risk_level` de la misión para calcular probabilidades de fallo (RNG).
 func resolve_mission_result(mission: Mission) -> Dictionary:
 	var result: Dictionary = {}
 	var risk_roll := randf()
-	var risk_threshold := 0.15 * float(mission.risk_level) # 0.15 / 0.30 / 0.45 aprox
+	# Probabilidad base de fallo aumenta con nivel de riesgo (0.15, 0.30, 0.45)
+	var risk_threshold := 0.15 * float(mission.risk_level) 
+	
+	# TODO: Aqui se podrian aplicar modificadores del vehículo/conductor para reducir riesgo
 
 	if risk_roll < risk_threshold:
-		# Falló la misión
+		# Falló la misión o hubo incidente grave
 		result.success = false
 		result.event = mission.risk_type
-		result.cost = mission.base_cost + randi_range(50, 150)
+		
+		match mission.risk_type:
+			"robo":
+				result.cost = mission.base_cost + mission.reward * 0.5 # Pierde carga
+				result.message = "Robo de carga! Perdiste mercancía."
+			"accidente":
+				result.cost = mission.base_cost + 200 # Reparaciones
+				result.message = "Accidente en ruta. Vehículo dañado."
+			"multa":
+				result.cost = mission.base_cost + 100
+				result.message = "Multa por exceso de velocidad."
+			_:
+				result.cost = mission.base_cost + 50
+				result.message = "Incidente menor."
 	else:
 		# Misión exitosa
 		result.success = true
 		result.event = "ok"
 		result.gain = mission.reward - mission.base_cost
+		result.message = "Misión completada con éxito."
 
 	mission.status = Mission.STATUS_FINISHED
 	active_missions.erase(mission)
 
 	emit_signal("mission_finished", mission, result.success, result)
 
-	# Opcional: generamos una nueva misión para mantener la lista llena
+	# Opcional: generamos una nueva misión para mantener la lista llena y que el juego continúe
 	var new_mission := _create_random_mission()
 	active_missions.append(new_mission)
 	emit_signal("mission_created", new_mission)
