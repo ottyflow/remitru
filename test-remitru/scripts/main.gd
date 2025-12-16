@@ -25,6 +25,7 @@ const MAP_MAX_Z := 18.0
 
 var fleet: Array[Vehicle] = []
 var pending_mission_selection: Mission = null
+var pending_vehicle_selection: Vehicle = null
 
 func _ready() -> void:
     # Inicializar generador de números aleatorios
@@ -37,11 +38,13 @@ func _ready() -> void:
     # Conectar señales de la UI
 	ui.mission_selected.connect(_on_ui_mission_selected)
 	ui.vehicle_selected.connect(_on_ui_vehicle_selected)
+	ui.driver_selected.connect(_on_ui_driver_selected)
 
     # Crear la flota inicial de vehículos
 	_spawn_initial_fleet()
 
-	# AHORA sí generamos las misiones (después de conectar señales para recibir las notificaciones)
+	# Generar staff y misiones
+	mission_manager.generate_initial_drivers(4)
 	mission_manager.generate_initial_missions(5)
 
     # Actualizar UI con valores iniciales
@@ -77,9 +80,10 @@ func _on_ui_mission_selected(mission_id: String) -> void:
 
 	# Guardar seleccion y mostrar selector de vehiculos
 	pending_mission_selection = mission
+	pending_vehicle_selection = null
 	ui.show_vehicle_selector(fleet)
 
-## Callback llamado cuando el usuario selecciona un vehículo para realizar la misión pendiente.
+## Callback llamado cuando el usuario selecciona un vehículo.
 func _on_ui_vehicle_selected(vehicle_index: int) -> void:
 	if pending_mission_selection == null:
 		return
@@ -90,13 +94,33 @@ func _on_ui_vehicle_selected(vehicle_index: int) -> void:
 	var selected_vehicle = fleet[vehicle_index]
 	if selected_vehicle.on_mission:
 		ui.show_notification("Vehículo ocupado.")
-		return # No deberia pasar si la UI deshabilita el botón
+		return
+	
+	pending_vehicle_selection = selected_vehicle
+	
+	# AHORA: Mostrar selector de conductores
+	ui.show_driver_selector(mission_manager.staff)
+
+## Callback llamado cuando el usuario selecciona un conductor.
+func _on_ui_driver_selected(driver_index: int) -> void:
+	if pending_mission_selection == null or pending_vehicle_selection == null:
+		return
 		
-	_assign_mission_to_vehicle(selected_vehicle, pending_mission_selection)
+	if driver_index < 0 or driver_index >= mission_manager.staff.size():
+		return
+		
+	var selected_driver = mission_manager.staff[driver_index]
+	if selected_driver.status != 0: # IDLE
+		ui.show_notification("Conductor ocupado.")
+		return
+		
+	_assign_mission_to_vehicle(pending_vehicle_selection, selected_driver, pending_mission_selection)
+	
 	pending_mission_selection = null
+	pending_vehicle_selection = null
 
 ## Asigna una misión a un vehículo específico y calcula la ruta.
-func _assign_mission_to_vehicle(vehicle: Vehicle, mission: Mission) -> void:
+func _assign_mission_to_vehicle(vehicle: Vehicle, driver: Driver, mission: Mission) -> void:
 	mission_manager.start_mission(mission)
 
 	var path: Array[Vector3] = []
@@ -110,15 +134,16 @@ func _assign_mission_to_vehicle(vehicle: Vehicle, mission: Mission) -> void:
 
 	path.append(mission.end_point)
 
-	vehicle.assign_mission(mission, path)
-	ui.show_notification("Misión asignada a vehículo " + str(vehicle.type))
+	vehicle.assign_mission(mission, driver, path)
+	ui.show_notification("Misión: " + mission.name + " | Driver: " + driver.name)
 
 
 ## Callback llamado cuando un vehículo termina su recorrido físico.
-func _on_vehicle_mission_route_completed(_vehicle: Vehicle, mission: Mission) -> void:
+func _on_vehicle_mission_route_completed(vehicle: Vehicle, mission: Mission) -> void:
 	print("MAIN: vehículo reporta fin de ruta para misión:", mission.name)
     # Resolver el resultado de la misión (éxito o fallo por riesgo)
-	mission_manager.resolve_mission_result(mission)
+	# Pasamos el driver asignado al vehiculo para el calculo
+	mission_manager.resolve_mission_result(mission, vehicle.current_driver)
 
 ## Callback llamado cuando una misión ha finalizado (con éxito o fallo).
 ## Aquí se actualiza el dinero y la reputación.

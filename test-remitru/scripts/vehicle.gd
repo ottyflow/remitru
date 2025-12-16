@@ -21,6 +21,7 @@ enum VehicleType {
 @export var maintenance_level: float = 1.0 # 1.0 = perfecto, 0.0 = roto
 
 var current_mission: Mission = null
+var current_driver: Driver = null
 var path: Array[Vector3] = [] # Puntos de destino secuenciales
 var path_index: int = 0
 var on_mission: bool = false
@@ -29,12 +30,21 @@ signal mission_route_completed(vehicle: Vehicle, mission: Mission)
 
 ## Asigna una ruta y una misión activa al vehículo. 
 ## Teletransporta al inicio de la ruta inmediatamente (simplificación).
-func assign_mission(mission: Mission, path_points: Array[Vector3]) -> void:
+func assign_mission(mission: Mission, assigned_driver: Driver, path_points: Array[Vector3]) -> void:
 	if mission == null or path_points.is_empty():
 		print("VEHICLE: assign_mission llamado con datos inválidos")
 		return
 
+	if assigned_driver == null:
+		print("VEHICLE: assign_mission sin driver!")
+		return
+
 	current_mission = mission
+	current_driver = assigned_driver
+	
+	# Actualizar estado del driver
+	current_driver.status = Driver.Status.ON_MISSION
+	
 	path = path_points.duplicate()
 	path_index = 0
 	on_mission = true
@@ -42,7 +52,7 @@ func assign_mission(mission: Mission, path_points: Array[Vector3]) -> void:
 	# Mover al punto inicial inmediatamente
 	global_position = path[0]
 
-	print("VEHICLE: misión asignada. Path size =", path.size())
+	print("VEHICLE: misión asignada a ", current_driver.name, ". Path size =", path.size())
 	print("VEHICLE: start pos =", global_position)
 
 ## Procesa el movimiento frame a frame.
