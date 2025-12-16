@@ -11,10 +11,22 @@ signal mission_started(mission: Mission)
 signal mission_finished(mission: Mission, success: bool, result: Dictionary)
 
 var active_missions: Array[Mission] = []
+var staff: Array[Driver] = []
 
 func _ready() -> void:
 	randomize()
 	# NO generamos misiones acá, se llama desde Main para asegurar orden de inicialización
+
+## Genera un lote inicial de conductores.
+func generate_initial_drivers(count: int = 3) -> void:
+	var names = ["Juan", "Ana", "Carlos", "Sofia", "Miguel", "Lucia"]
+	for i in range(count):
+		var d_name = names[randi() % names.size()] + " " + str(randi() % 100)
+		var skill = randf_range(0.3, 0.9)
+		var stress = randf_range(0.3, 0.9)
+		var new_driver = Driver.new(d_name, skill, stress)
+		staff.append(new_driver)
+		print("MISSION MANAGER: Nuevo conductor contratado: " + d_name)
 
 ## Genera un lote inicial de misiones.
 func generate_initial_missions(count: int = 5) -> void:
@@ -95,18 +107,33 @@ func start_mission(mission: Mission) -> void:
 
 ## Determina el resultado final de una misión completada.
 ## Utiliza el `risk_level` de la misión para calcular probabilidades de fallo (RNG).
-func resolve_mission_result(mission: Mission) -> Dictionary:
+func resolve_mission_result(mission: Mission, assigned_driver: Driver = null) -> Dictionary:
 	var result: Dictionary = {}
 	var risk_roll := randf()
 	# Probabilidad base de fallo aumenta con nivel de riesgo (0.15, 0.30, 0.45)
-	var risk_threshold := 0.15 * float(mission.risk_level) 
+	var base_risk := 0.15 * float(mission.risk_level) 
 	
-	# TODO: Aqui se podrian aplicar modificadores del vehículo/conductor para reducir riesgo
+	# Mitigación por habilidad del conductor (si existe)
+	var mitigation := 0.0
+	if assigned_driver != null:
+		mitigation = assigned_driver.driving_skill * 0.10 # Reduce hasta un 10% plano o algo asi
+		# Ojo: si mitigation es muy alta, el risk se vuelve 0.
+		# Ajuste: skill 1.0 reduce el riesgo a la mitad?
+		# Formula: risk_final = base_risk * (1.0 - (skill * 0.5))
+		base_risk = base_risk * (1.0 - (assigned_driver.driving_skill * 0.5))
+		assigned_driver.add_xp(1)
+	
+	var risk_threshold := base_risk
+	
+	print("MISSION RESULT: Risk Roll: ", risk_roll, " Threshold: ", risk_threshold, " (Driver Skill: ", assigned_driver.driving_skill if assigned_driver else "None", ")")
 
 	if risk_roll < risk_threshold:
 		# Falló la misión o hubo incidente grave
 		result.success = false
 		result.event = mission.risk_type
+		
+		# Si el conductor tiene buen stress_tolerance, quizas reduce el costo del fallo?
+		# Por ahora lo dejamos simple.
 		
 		match mission.risk_type:
 			"robo":
@@ -130,6 +157,10 @@ func resolve_mission_result(mission: Mission) -> Dictionary:
 
 	mission.status = Mission.STATUS_FINISHED
 	active_missions.erase(mission)
+	
+	# Liberar Driver
+	if assigned_driver:
+		assigned_driver.status = Driver.Status.IDLE
 
 	emit_signal("mission_finished", mission, result.success, result)
 

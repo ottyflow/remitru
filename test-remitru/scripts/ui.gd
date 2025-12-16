@@ -7,6 +7,7 @@ class_name GameUI
 
 signal mission_selected(mission_id: String)
 signal vehicle_selected(vehicle_index: int)
+signal driver_selected(driver_index: int)
 
 @onready var money_label: Label = $TopLeftPanel/MoneyLabel
 @onready var reputation_label: Label = $TopLeftPanel/ReputationLabel
@@ -15,10 +16,12 @@ signal vehicle_selected(vehicle_index: int)
 
 var mission_map: Dictionary = {} # mission_id -> Mission
 var vehicle_selector_panel: Panel = null
+var driver_selector_panel: Panel = null
 
 func _ready() -> void:
 	notification_label.text = "UI lista"
 	_create_vehicle_selector_ui()
+	_create_driver_selector_ui()
 
 ## Crea programáticamente el panel y layout para el selector de vehículos.
 func _create_vehicle_selector_ui() -> void:
@@ -37,6 +40,24 @@ func _create_vehicle_selector_ui() -> void:
 	
 	var label = Label.new()
 	label.text = "Selecciona un Vehículo"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(label)
+
+## Crea programáticamente el panel y layout para el selector de conductores.
+func _create_driver_selector_ui() -> void:
+	driver_selector_panel = Panel.new()
+	driver_selector_panel.visible = false
+	driver_selector_panel.size = Vector2(300, 400)
+	driver_selector_panel.position = Vector2(720, 100) 
+	add_child(driver_selector_panel)
+	
+	var vbox = VBoxContainer.new()
+	vbox.name = "VBox"
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	driver_selector_panel.add_child(vbox)
+	
+	var label = Label.new()
+	label.text = "Selecciona un Conductor"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(label)
 
@@ -124,3 +145,31 @@ func show_vehicle_selector(fleet: Array) -> void:
 func hide_vehicle_selector() -> void:
 	if vehicle_selector_panel:
 		vehicle_selector_panel.visible = false
+
+## Muestra el panel selector de conductores
+func show_driver_selector(staff: Array) -> void:
+	if not driver_selector_panel: return
+	
+	driver_selector_panel.visible = true
+	var vbox = driver_selector_panel.get_node("VBox")
+	for i in range(1, vbox.get_child_count()):
+		vbox.get_child(i).queue_free()
+		
+	for i in range(staff.size()):
+		var driver = staff[i]
+		var btn = Button.new()
+		
+		var status_txt = "Disponible"
+		if driver.status != 0: # IDLE
+			status_txt = "Ocupado"
+			
+		btn.text = "%s [S:%.1f] - %s" % [driver.name, driver.driving_skill, status_txt]
+		if driver.status != 0:
+			btn.disabled = true
+			
+		btn.pressed.connect(func():
+			driver_selector_panel.visible = false
+			emit_signal("driver_selected", i)
+		)
+		vbox.add_child(btn)
+
