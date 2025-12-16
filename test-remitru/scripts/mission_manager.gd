@@ -106,13 +106,26 @@ func start_mission(mission: Mission) -> void:
 	emit_signal("mission_started", mission)
 
 ## Determina el resultado final de una misión completada.
-## Utiliza el `risk_level` de la misión para calcular probabilidades de fallo (RNG).
-func resolve_mission_result(mission: Mission, assigned_driver: Driver = null) -> Dictionary:
+## Utiliza el `risk_level` de la misión y estado del vehículo para calcular probabilidades de fallo (RNG).
+func resolve_mission_result(mission: Mission, assigned_vehicle: Vehicle = null) -> Dictionary:
 	var result: Dictionary = {}
+	var assigned_driver = assigned_vehicle.current_driver if assigned_vehicle else null
+	
+	# Aplicar Desgaste al Vehículo
+	if assigned_vehicle:
+		# Desgaste base 10% + variable por distancia/tipo (simplificado a 15% fijo por ahora)
+		assigned_vehicle.apply_wear(0.15)
+	
 	var risk_roll := randf()
 	# Probabilidad base de fallo aumenta con nivel de riesgo (0.15, 0.30, 0.45)
 	var base_risk := 0.15 * float(mission.risk_level) 
 	
+	# Penalización por Mal Estado del Vehículo
+	if assigned_vehicle and assigned_vehicle.maintenance_level < 0.5:
+		# Si está bajo 50%, el riesgo aumenta drásticamente
+		base_risk += (0.5 - assigned_vehicle.maintenance_level) * 0.5
+		print("MISSION RESULT: Penalización por mal estado: +", (0.5 - assigned_vehicle.maintenance_level) * 0.5)
+
 	# Mitigación por habilidad del conductor (si existe)
 	var mitigation := 0.0
 	if assigned_driver != null:

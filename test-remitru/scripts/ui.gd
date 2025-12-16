@@ -7,6 +7,7 @@ class_name GameUI
 
 signal mission_selected(mission_id: String)
 signal vehicle_selected(vehicle_index: int)
+signal vehicle_repair_requested(vehicle_index: int)
 signal driver_selected(driver_index: int)
 
 @onready var money_label: Label = $TopLeftPanel/MoneyLabel
@@ -28,14 +29,18 @@ func _create_vehicle_selector_ui() -> void:
 	# Crear panel flotante para seleccionar vehiculos
 	vehicle_selector_panel = Panel.new()
 	vehicle_selector_panel.visible = false
-	vehicle_selector_panel.size = Vector2(300, 400)
+	vehicle_selector_panel.size = Vector2(400, 500) # Más alto para mostrar barras
 	# Centrar mas o menos
-	vehicle_selector_panel.position = Vector2(400, 100) 
+	vehicle_selector_panel.position = Vector2(400, 50) 
 	add_child(vehicle_selector_panel)
 	
 	var vbox = VBoxContainer.new()
 	vbox.name = "VBox"
 	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Add some margin
+	vbox.position = Vector2(10, 10)
+	vbox.size = Vector2(380, 480)
+	
 	vehicle_selector_panel.add_child(vbox)
 	
 	var label = Label.new()
@@ -119,9 +124,12 @@ func show_vehicle_selector(fleet: Array) -> void:
 		
 	for i in range(fleet.size()):
 		var veh = fleet[i]
-		var btn = Button.new()
 		
-		# Intentar obtener nombre legible del tipo
+		# Contenedor por Fila
+		var hbox = HBoxContainer.new()
+		vbox.add_child(hbox)
+		
+		# Info del Vehiculo
 		var type_name = "Vehículo"
 		if "type" in veh:
 			match veh.type:
@@ -129,10 +137,13 @@ func show_vehicle_selector(fleet: Array) -> void:
 				1: type_name = "Van"
 				2: type_name = "Camión"
 		
-		var status = "Disponible"
+		var status = "OK"
 		if veh.on_mission: status = "Ocupado"
 		
+		# Boton Seleccionar
+		var btn = Button.new()
 		btn.text = "%s - %s" % [type_name, status]
+		btn.custom_minimum_size = Vector2(120, 0)
 		if veh.on_mission:
 			btn.disabled = true
 			
@@ -140,7 +151,35 @@ func show_vehicle_selector(fleet: Array) -> void:
 			vehicle_selector_panel.visible = false
 			emit_signal("vehicle_selected", i)
 		)
-		vbox.add_child(btn)
+		hbox.add_child(btn)
+		
+		# Barra de Progreso Mantenimiento
+		var progress = ProgressBar.new()
+		progress.custom_minimum_size = Vector2(100, 20)
+		progress.min_value = 0
+		progress.max_value = 100
+		progress.value = veh.maintenance_level * 100
+		# Color simple coding style (Modulate)
+		if veh.maintenance_level < 0.3:
+			progress.modulate = Color.RED
+		elif veh.maintenance_level < 0.7:
+			progress.modulate = Color.YELLOW
+		else:
+			progress.modulate = Color.GREEN
+			
+		hbox.add_child(progress)
+		
+		# Boton Reparar (Si no esta al 100%)
+		if veh.maintenance_level < 0.99 and not veh.on_mission:
+			var repair_btn = Button.new()
+			# Coste aproximado: $100 para reparar from 0 to 100.
+			var cost = int((1.0 - veh.maintenance_level) * 100)
+			repair_btn.text = "Reparar ($%d)" % cost
+			repair_btn.pressed.connect(func():
+				emit_signal("vehicle_repair_requested", i)
+				# No cerramos panel, idealmente refrescamos
+			)
+			hbox.add_child(repair_btn)
 
 func hide_vehicle_selector() -> void:
 	if vehicle_selector_panel:
@@ -172,4 +211,3 @@ func show_driver_selector(staff: Array) -> void:
 			emit_signal("driver_selected", i)
 		)
 		vbox.add_child(btn)
-
