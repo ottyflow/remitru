@@ -80,3 +80,14 @@ func _physics_process(_delta: float) -> void:
 	var dir: Vector3 = to_target.normalized()
 	velocity = dir * speed
 	move_and_slide()
+
+## Aplica desgaste al vehículo.
+## amount: Cantidad de desgaste (0.0 a 1.0) a restar de maintenance_level.
+func apply_wear(amount: float) -> void:
+	maintenance_level = clamp(maintenance_level - amount, 0.0, 1.0)
+	print("VEHICLE: Desgaste aplicado. Nivel actual de mantenimiento: ", maintenance_level * 100, "%")
+
+## Repara el vehículo al 100%.
+func repair() -> void:
+	maintenance_level = 1.0
+	print("VEHICLE: Reparado al 100%")

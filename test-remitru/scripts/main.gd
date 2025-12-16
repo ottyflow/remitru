@@ -28,26 +28,27 @@ var pending_mission_selection: Mission = null
 var pending_vehicle_selection: Vehicle = null
 
 func _ready() -> void:
-    # Inicializar generador de números aleatorios
+	# Inicializar generador de números aleatorios
 	randomize()
 
-    # Conectar señales del MissionManager
+	# Conectar señales del MissionManager
 	mission_manager.mission_created.connect(_on_mission_created)
 	mission_manager.mission_finished.connect(_on_mission_finished)
-    
-    # Conectar señales de la UI
+	
+	# Conectar señales de la UI
 	ui.mission_selected.connect(_on_ui_mission_selected)
 	ui.vehicle_selected.connect(_on_ui_vehicle_selected)
 	ui.driver_selected.connect(_on_ui_driver_selected)
+	ui.vehicle_repair_requested.connect(_on_ui_vehicle_repair_requested)
 
-    # Crear la flota inicial de vehículos
+	# Crear la flota inicial de vehículos
 	_spawn_initial_fleet()
 
 	# Generar staff y misiones
 	mission_manager.generate_initial_drivers(4)
 	mission_manager.generate_initial_missions(5)
 
-    # Actualizar UI con valores iniciales
+	# Actualizar UI con valores iniciales
 	ui.update_money(money)
 	ui.update_reputation(reputation)
 	ui.show_notification("Elegí una misión para empezar")
@@ -119,6 +120,28 @@ func _on_ui_driver_selected(driver_index: int) -> void:
 	pending_mission_selection = null
 	pending_vehicle_selection = null
 
+## Callback cuando se pide reparar un vehículo.
+func _on_ui_vehicle_repair_requested(vehicle_index: int) -> void:
+	if vehicle_index < 0 or vehicle_index >= fleet.size():
+		return
+		
+	var veh = fleet[vehicle_index]
+	if veh.on_mission:
+		return
+		
+	# Coste aproximado: $100 para reparar from 0 to 100.
+	var cost = int((1.0 - veh.maintenance_level) * 100)
+	
+	if money >= cost:
+		money -= cost
+		veh.repair()
+		ui.update_money(money)
+		ui.show_notification("Vehículo reparado por $" + str(cost))
+		# Refrescar UI si el panel está abierto (truco: reabrirlo)
+		ui.show_vehicle_selector(fleet)
+	else:
+		ui.show_notification("No tienes suficiente dinero para reparar.")
+
 ## Asigna una misión a un vehículo específico y calcula la ruta.
 func _assign_mission_to_vehicle(vehicle: Vehicle, driver: Driver, mission: Mission) -> void:
 	mission_manager.start_mission(mission)
@@ -141,9 +164,9 @@ func _assign_mission_to_vehicle(vehicle: Vehicle, driver: Driver, mission: Missi
 ## Callback llamado cuando un vehículo termina su recorrido físico.
 func _on_vehicle_mission_route_completed(vehicle: Vehicle, mission: Mission) -> void:
 	print("MAIN: vehículo reporta fin de ruta para misión:", mission.name)
-    # Resolver el resultado de la misión (éxito o fallo por riesgo)
+	# Resolver el resultado de la misión (éxito o fallo por riesgo)
 	# Pasamos el driver asignado al vehiculo para el calculo
-	mission_manager.resolve_mission_result(mission, vehicle.current_driver)
+	mission_manager.resolve_mission_result(mission, vehicle)
 
 ## Callback llamado cuando una misión ha finalizado (con éxito o fallo).
 ## Aquí se actualiza el dinero y la reputación.
@@ -163,4 +186,3 @@ func _on_mission_finished(mission: Mission, success: bool, result: Dictionary) -
 	ui.clear_missions_list()
 	for m in mission_manager.active_missions:
 		ui.add_mission_to_list(m)
-
